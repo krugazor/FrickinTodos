@@ -11,7 +11,6 @@ import KituraSessionRedis
 import KituraCompression
 import DictionaryCoding
 
-
 func todosFromSession(_ s: SessionState?) -> [Todo] {
     if let t = s?["todos"] as? [Todo] { return t }
     else if let t = try? DictionaryCoding().decode([Todo].self, from: s?["todos"]) { return t }
@@ -164,6 +163,8 @@ router.get("/") { request, response, next in
     for e in editables { editscript += e }
     editscript += "});\n"
     
+    let tinySSID = (UUID(uuidString: request.session?.id ?? "") ?? UUID()).tinyWord
+    
     response.send(
         Node.fragment([
             Node.doctype("html"),
@@ -180,22 +181,29 @@ router.get("/") { request, response, next in
                     .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.10.4/jquery-ui.js")]),
                     .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/poshytip/1.2/jquery.poshytip.min.js")]),
                     .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js")]),
-                    .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/x-editable/1.5.1/jqueryui-editable/js/jqueryui-editable.min.js")])
+                    .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/x-editable/1.5.1/jqueryui-editable/js/jqueryui-editable.min.js")]),
+                    .script(attributes: [.src("https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.4/clipboard.min.js")])
                 ),
                 .body(
                     .iframe(attributes: [.id("dliframe"), .style(unsafe: "display:none;")], .raw("") ),
+                    
                     .div(attributes: [.class("col-sm-6")],
+                         .div(attributes: [],
+                            .button(attributes: [.title(""), .id("shareBtn"), .class("button-hover"), .data("clipboard-text", request.urlURL.absoluteString+"restore?ssid=\(tinySSID)")],
+                                    .span(.text("Share this (\(tinySSID))"))
+                            )
+                        ),
                          .div(attributes: [.id("accordion")],
                               .fragment(rendered)
                         ),
                          .div(
                             .span(attributes: [.style(unsafe: "float: left;")],
                                   .input(attributes: [.type(.image), .src("/add.png"), .alt("add"), .onclick(unsafe: "newtodo();")]),
-                                .input(attributes: [.type(.image), .src("/clear.png"), .alt("clear"), .onclick(unsafe: "cleartodos();")])
-                                ),
+                                  .input(attributes: [.type(.image), .src("/clear.png"), .alt("clear"), .onclick(unsafe: "cleartodos();")])
+                            ),
                             .span(attributes: [.style(unsafe: "float: right;")],
                                   .input(attributes: [.type(.image), .src("/export.png"), .alt("export"), .onclick(unsafe: "getmd();")]),
-                              .input(attributes: [.type(.image), .src("/next.png"), .alt("skip"), .onclick(unsafe: "nextMeeting();")])
+                                  .input(attributes: [.type(.image), .src("/next.png"), .alt("skip"), .onclick(unsafe: "nextMeeting();")])
                             )
                         )
                     ),
@@ -204,6 +212,17 @@ router.get("/") { request, response, next in
                     $( function() {
                       $( "#accordion" ).accordion({
                         heightStyle: "content"
+                      });
+                        
+                      var btn = document.getElementById('shareBtn');
+                      var clipboard = new ClipboardJS(btn);
+                      clipboard.on('success', function(e) {
+                        $.get("/share"); // make sure we save
+                        $('#shareBtn').tooltip( {
+                          content: "Copied to clipboard",
+                          show: { duration: 200 },
+                          hide: { duration: 200, delay: 200 }
+                        }).tooltip("open");
                       });
                     } );
 
@@ -357,6 +376,7 @@ router.post("/change") { request, response, next in
     } else {
         response.send(json: ["success": false])
     }
+    
     next()
 }
 
@@ -366,6 +386,44 @@ router.post("/next") { request, response, next in
     }
     saveTodos(todos, to: request.session)
     response.send(json: ["success": true])
+}
+
+router.get("/share") { request, response, next in
+    if let suuid = UUID(uuidString: request.session?.id ?? "") {
+        permanentlyStore(todosFromSession(request.session), for: suuid) { (result) in
+            print("Stored session: \(result)")
+            response.send(json: ["success": result])
+            next()
+        }
+    } else {
+        response.send(json: ["success": false])
+        next()
+    }
+}
+
+router.get("/restore") { request, response, next in
+    guard let ssids = request.queryParameters["ssid"] else {
+        response.status(.notFound)
+        next()
+        return
+    }
+    guard let ssid = UUID(tinyWord: ssids) else {
+        response.status(.notFound)
+        next()
+        return
+    }
+    
+    restoreFromPermanent(for: ssid) { (todos) in
+        if todos.count == 0 && todosFromSession(request.session).count != 0 {
+            // hmmmmm maybe not a good idea?
+            next()
+            return
+        }
+        
+        saveTodos(todos, to: request.session)
+        try? response.redirect("/")
+        next()
+    }
 }
 
 Kitura.addHTTPServer(onPort: 8080, with: router)

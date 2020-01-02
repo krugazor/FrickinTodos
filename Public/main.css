@@ -22,3 +22,44 @@ h3 img {
   text-decoration: none;
     border-bottom: none;
 }
+
+/* inspired from https://codepen.io/mohaiman/pen/jqKzVb */
+.button-hover {
+  text-align: center;
+  cursor: pointer;
+  font-size:14px;
+  margin: 10px 0 10px 0;
+
+  border-radius: 4px;
+  background-color:lightgray;
+  border-color:darkgray;
+  border-style:solid;
+  padding: 4px;
+  transition: all 0.5s;
+}
+
+
+.button-hover span {
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  transition: 0.5s;
+}
+
+.button-hover span:after {
+  content: '»';
+  position: absolute;
+  opacity: 0;
+  top: 0;
+  right: -20px;
+  transition: 0.5s;
+}
+
+.button-hover:hover span {
+  padding-right: 25px;
+}
+
+.button-hover:hover span:after {
+  opacity: 1;
+  right: 0;
+}
