@@ -65,6 +65,15 @@
         }
       },
       {
+        "package": "KituraLangNeg",
+        "repositoryURL": "https://github.com/krugazor/Kitura-LanguageNegotiation",
+        "state": {
+          "branch": null,
+          "revision": "1be2d8b5de91c7315016689a4f00d5803afe4121",
+          "version": "0.1.1"
+        }
+      },
+      {
         "package": "Kitura-net",
         "repositoryURL": "https://github.com/IBM-Swift/Kitura-net.git",
         "state": {
@@ -107,6 +116,15 @@
           "branch": null,
           "revision": "d62d74bca48c6fb76f9fc1f48eeb2d7af415e80b",
           "version": "2.0.1"
+        }
+      },
+      {
+        "package": "KituraTranslation",
+        "repositoryURL": "https://github.com/krugazor/Kitura-Translation",
+        "state": {
+          "branch": null,
+          "revision": "f777bb0443f761a0d1bf2aeb9e575f080ad2bf5a",
+          "version": "0.1.0"
         }
       },
       {
