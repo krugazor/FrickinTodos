@@ -3,6 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 import HeliumLogger
+import LoggerAPI
 
 import HtmlKituraSupport
 import Kitura
@@ -10,6 +11,9 @@ import KituraSession
 import KituraSessionRedis
 import KituraCompression
 import DictionaryCoding
+
+import KituraLangNeg
+import KituraTranslation
 
 func loadTodos(from s: SessionState?) -> TodoList {
     if let t = s?["todos"] as? TodoList {
@@ -94,11 +98,25 @@ func editableBlurbJS(_ uidVariable: String) -> String {
 
 HeliumLogger.use()
 
+// Try to initialize LanguageNegotiation
+guard let ln = try? LanguageNegotiation(["en", "fr"], methods: [.header, .subdomain]) else {
+    Log.error("Something went horribly wrong.")
+    exit(1)
+}
+
+// Load translations
+let poDir = URL(fileURLWithPath: #file + "/../../../Translations").standardizedFileURL.path
+
+// Set settings for Translation.
+let settings = TranslationSettings(lang: "en", poDir: poDir)
+Translation.settings = settings
+
+
 let router = Router()
 let redisStore = RedisStore(redisHost: "127.0.0.1", redisPort: 6379, redisPassword: "zxcvbnm", db: 1)
 let session = Session(secret: "okmijnuhb", store: redisStore)
 
-router.all(middleware: session, StaticFileServer(path: "./Public"), BodyParser(), Compression())
+router.all(middleware: session, StaticFileServer(path: "./Public"), BodyParser(), Compression(), ln)
 
 router.get("/") { request, response, next in
     let todos = loadTodos(from: request.session)
@@ -167,6 +185,19 @@ router.get("/") { request, response, next in
     for e in editables { editscript += e }
     editscript += "});\n"
     
+    // LanguageNegotiation should have put its match info
+     // in request.userInfo["LangNeg"], so check for it
+     // there.
+     if request.userInfo["LangNeg"] == nil {
+         Translation.settings!.lang = "en"
+     }
+     else {
+         let match = request.userInfo["LangNeg"] as! LanguageNegotiation.NegMatch
+         // Have Translation use the language that LangNeg
+         // matched on.
+         Translation.settings!.lang = match.lang
+     }
+    
     response.send(
         Node.fragment([
             Node.doctype("html"),
@@ -192,7 +223,7 @@ router.get("/") { request, response, next in
                     .div(attributes: [.class("col-sm-6")],
                          .div(attributes: [],
                               .button(attributes: [.title(""), .id("shareBtn"), .class("button-hover"), .data("clipboard-text", request.urlURL.absoluteString+"restore?ssid=\(todos.id.tinyWord)")],
-                                      .span(.text("Share this (\(todos.id.tinyWord))"))
+                                      .span(.text("Share this".t() + " (\(todos.id.tinyWord))"))
                             )
                         ),
                          .div(attributes: [.id("accordion")],

@@ -1,0 +1,2 @@
+msgid "Share this"
+msgstr "Partager"
