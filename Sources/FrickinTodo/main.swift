@@ -11,17 +11,21 @@ import KituraSessionRedis
 import KituraCompression
 import DictionaryCoding
 
-func todosFromSession(_ s: SessionState?) -> [Todo] {
-    if let t = s?["todos"] as? [Todo] { return t }
-    else if let t = try? DictionaryCoding().decode([Todo].self, from: s?["todos"]) { return t }
+func loadTodos(from s: SessionState?) -> TodoList {
+    if let t = s?["todos"] as? TodoList {
+        return t
+    } else if let t = try? DictionaryCoding().decode(TodoList.self, from: s?["todos"]) {
+        return t
+    }
     let t = [
         Todo(id: UUID(), title: "New Item", comment: nil, status: .pending),
     ]
-    saveTodos(t, to: s)
-    return t
+    let l = TodoList(t)
+    saveTodos(l, to: s)
+    return l
 }
 
-func saveTodos(_ t: [Todo], to session: SessionState?) {
+func saveTodos(_ t: TodoList, to session: SessionState?) {
     session?["todos"] = t
     session?.save(callback: { (err) in
         if let err = err { print("Error saving session: \(err.localizedDescription)") }
@@ -97,10 +101,10 @@ let session = Session(secret: "okmijnuhb", store: redisStore)
 router.all(middleware: session, StaticFileServer(path: "./Public"), BodyParser(), Compression())
 
 router.get("/") { request, response, next in
-    let todos = todosFromSession(request.session)
+    let todos = loadTodos(from: request.session)
     
-    let rendered = todos.map { $0.asHtmlNode }
-    let editables = todos.map { t in
+    let rendered = todos.list.map { $0.asHtmlNode }
+    let editables = todos.list.map { t in
         return """
         $('#\(t.titleid)').editable({
         type:  'text',
@@ -163,8 +167,6 @@ router.get("/") { request, response, next in
     for e in editables { editscript += e }
     editscript += "});\n"
     
-    let tinySSID = (UUID(uuidString: request.session?.id ?? "") ?? UUID()).tinyWord
-    
     response.send(
         Node.fragment([
             Node.doctype("html"),
@@ -189,8 +191,8 @@ router.get("/") { request, response, next in
                     
                     .div(attributes: [.class("col-sm-6")],
                          .div(attributes: [],
-                            .button(attributes: [.title(""), .id("shareBtn"), .class("button-hover"), .data("clipboard-text", request.urlURL.absoluteString+"restore?ssid=\(tinySSID)")],
-                                    .span(.text("Share this (\(tinySSID))"))
+                              .button(attributes: [.title(""), .id("shareBtn"), .class("button-hover"), .data("clipboard-text", request.urlURL.absoluteString+"restore?ssid=\(todos.id.tinyWord)")],
+                                      .span(.text("Share this (\(todos.id.tinyWord))"))
                             )
                         ),
                          .div(attributes: [.id("accordion")],
@@ -311,7 +313,7 @@ let df = DateFormatter()
 df.dateStyle = .short
 df.timeStyle = .short
 router.get("/download") { request, response, next in
-    let notes = todosFromSession(request.session)
+    let notes = loadTodos(from: request.session)
     
     let output = "### Notes (\(df.string(from: Date())))\n\n" + notes.toMarkdown
     
@@ -325,15 +327,19 @@ router.get("/download") { request, response, next in
 }
 
 router.post("/clear") { request, response, next in
-    saveTodos([], to: request.session)
+    saveTodos(TodoList(), to: request.session)
     response.send(json: ["success": true])
     next()
 }
 
 router.post("/new") { request, response, next in
     if let b = request.body, let c = b.asURLEncoded, let uid = c["id"], let uuid = UUID(uuidString: uid) {
-        var todos = todosFromSession(request.session)
-        todos.append(Todo(id: uuid, title: "New", comment: "", status: .pending))
+        var todos = loadTodos(from: request.session)
+        // save and move on
+        permanentlyStore(todos, callback: {_ in })
+        
+        todos = TodoList()
+        todos.list.append(Todo(id: uuid, title: "New", comment: "", status: .pending))
         saveTodos(todos, to: request.session)
         response.send(json: ["success": true])
     } else {
@@ -345,7 +351,8 @@ router.post("/new") { request, response, next in
 
 router.post("/change") { request, response, next in
     if let b = request.body, let c = b.asURLEncoded {
-        var notes = todosFromSession(request.session)
+        var list = loadTodos(from: request.session)
+        var notes = list.list
         switch c["name"] {
         case "title":
             if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.firstIndex(where: { $0.id == pkid } ) {
@@ -371,7 +378,8 @@ router.post("/change") { request, response, next in
             return
         }
         
-        saveTodos(notes, to: request.session)
+        list.list = notes
+        saveTodos(list, to: request.session)
         response.send(json: ["success": true])
     } else {
         response.send(json: ["success": false])
@@ -381,22 +389,22 @@ router.post("/change") { request, response, next in
 }
 
 router.post("/next") { request, response, next in
-    var todos = todosFromSession(request.session).filter { $0.status != .done }.map {
+    // save and move on
+    let old = loadTodos(from: request.session)
+    permanentlyStore(old, callback: {_ in })
+
+    let todos = old.list.filter { $0.status != .done }.map {
         return Todo(id: $0.id, title: $0.title, comment: $0.comment, status: .pending)
     }
-    saveTodos(todos, to: request.session)
+    saveTodos(TodoList(todos), to: request.session)
     response.send(json: ["success": true])
 }
 
 router.get("/share") { request, response, next in
-    if let suuid = UUID(uuidString: request.session?.id ?? "") {
-        permanentlyStore(todosFromSession(request.session), for: suuid) { (result) in
-            print("Stored session: \(result)")
-            response.send(json: ["success": result])
-            next()
-        }
-    } else {
-        response.send(json: ["success": false])
+    let notes = loadTodos(from: request.session)
+    permanentlyStore(notes) { (result) in
+        print("Stored session: \(result)")
+        response.send(json: ["success": result])
         next()
     }
 }
@@ -414,14 +422,14 @@ router.get("/restore") { request, response, next in
     }
     
     restoreFromPermanent(for: ssid) { (todos) in
-        if todos.count == 0 && todosFromSession(request.session).count != 0 {
+        if todos.list.count == 0 && loadTodos(from: request.session).list.count != 0 {
             // hmmmmm maybe not a good idea?
             next()
             return
         }
         
         saveTodos(todos, to: request.session)
-        try? response.redirect("/")
+        _ = try? response.redirect("/")
         next()
     }
 }

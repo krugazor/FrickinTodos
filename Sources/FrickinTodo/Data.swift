@@ -75,6 +75,25 @@ extension Array where Element == Todo {
     }
 }
 
+struct TodoList : Codable {
+    var id : UUID = UUID()
+    var list : [Todo]
+    
+    var toMarkdown : String { return list.toMarkdown }
+    
+    init() {
+        list = []
+    }
+    
+    init(_ l: [Todo]) {
+        list = l
+    }
+    
+    init(_ other: TodoList) {
+        list = other.list
+    }
+}
+
 // MARK: -
 
 extension UUID {
@@ -158,7 +177,7 @@ extension UUID {
 
 // MARK: -
 
-func permanentlyStore(_ todos : [Todo], for id: UUID, callback: @escaping (Bool)->Void) {
+func permanentlyStore(_ todos : TodoList, callback: @escaping (Bool)->Void) {
     let redis = Redis()
     redis.connect(host: redisStore.redisHost, port: redisStore.redisPort) { error in
         guard error == nil else {
@@ -178,7 +197,7 @@ func permanentlyStore(_ todos : [Todo], for id: UUID, callback: @escaping (Bool)
                     }
                     // using JSON... 🤷‍♂️
                     if let encoded = try? JSONEncoder().encode(todos), let serialized = String(data: encoded, encoding: .utf8) {
-                        redis.set(id.tinyWord, value: serialized, exists: nil, expiresIn: 4*24*3600) { (r, error) in // stored for 4 weeks
+                        redis.set(todos.id.tinyWord, value: serialized, exists: nil, expiresIn: 4*24*3600) { (r, error) in // stored for 4 weeks
                             guard error == nil else {
                                 callback(false)
                                 return
@@ -192,35 +211,35 @@ func permanentlyStore(_ todos : [Todo], for id: UUID, callback: @escaping (Bool)
     }
 }
 
-func restoreFromPermanent(for id: UUID, callback: @escaping ([Todo])->Void) {
+func restoreFromPermanent(for id: UUID, callback: @escaping (TodoList)->Void) {
     let redis = Redis()
     redis.connect(host: redisStore.redisHost, port: redisStore.redisPort) { error in
         guard error == nil else {
-            callback([])
+            callback(TodoList())
             return
         }
         if let redisPassword = redisStore.redisPassword {
             redis.auth(redisPassword) { error in
                 guard error == nil else {
-                    callback([])
+                    callback(TodoList())
                     return
                 }
                 redis.select(2) { error in // sessions in db1, longer term storage in db2
                     guard error == nil else {
-                        callback([])
+                        callback(TodoList())
                         return
                     }
                     
                     redis.get(id.tinyWord) { (s, error) in
                         guard error == nil else {
-                            callback([])
+                            callback(TodoList())
                             return
                         }
 
-                        if let encoded = s?.asData, let todos = try? JSONDecoder().decode([Todo].self, from: encoded) {
+                        if let encoded = s?.asData, let todos = try? JSONDecoder().decode(TodoList.self, from: encoded) {
                             callback(todos)
                         } else {
-                            callback([])
+                            callback(TodoList())
                         }
                     }
                 }
