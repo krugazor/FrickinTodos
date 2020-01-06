@@ -14,12 +14,6 @@ enum TodoStatus : String, Codable {
     case done
     case delayed
     
-    static var asXSource : String {
-        return """
-        [{value: 'pending', text: 'pending'},{value: 'done', text: 'done'},{value: 'delayed', text: 'delayed'}]
-        """
-    }
-    
     var imageName : String {
         return "/"+self.rawValue+".png"
     }
@@ -39,26 +33,6 @@ struct Todo : Codable {
     
     var imageName : String {
         return status.imageName
-    }
-    
-    var asHtmlNode : Node {
-        return Node.fragment([
-            .h3(
-                .span(attributes: [.id(self.editid)], .img(src: "/edit.png", alt: "Edit")),
-                .span(attributes: [.id(self.titleid)], .text(self.title))
-            ),
-            .div(
-                .div(attributes: [],
-                     .img(attributes: [.id(self.statusid), .src(self.imageName), .alt(self.status.rawValue), .height(.px(24)), .width(.px(24))]),
-                     .span(.raw("&nbsp;")),
-                     .span(attributes:[.id(self.statusid + "t"), .class("status-text")], .text(self.status.rawValue))
-                ),
-                .div(attributes: [],
-                     .span(attributes: [.id(self.commentid)], .text(self.comment ?? " "))
-                )
-            )
-        ])
-        
     }
 }
 

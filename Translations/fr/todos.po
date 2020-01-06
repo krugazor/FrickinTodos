@@ -1,2 +1,74 @@
 msgid "Share this"
 msgstr "Partager"
+
+msgid "Title"
+msgstr "Titre"
+
+msgid "Comment"
+msgstr "Commentaire"
+
+msgid "Status"
+msgstr "Statut"
+
+msgid "Error"
+msgstr "Erreur"
+
+msgid "Edit"
+msgstr "Éditer"
+
+msgid "New"
+msgstr "Nouveau"
+
+msgid "pending"
+msgstr "en attente"
+
+msgid "done"
+msgstr "traité"
+
+msgid "delayed"
+msgstr "reporté"
+
+msgid "add"
+msgstr "ajouter"
+
+msgid "clear"
+msgstr "effacer tout"
+
+msgid "export"
+msgstr "exporter"
+
+msgid "skip"
+msgstr "suivant"
+
+msgid "Copied to clipboard"
+msgstr "Copié dans le presse-papier"
+
+msgid "New"
+msgstr "Nouveau"
+
+msgid "Remove all notes?"
+msgstr "Tout effacer?"
+
+msgid "You will lose everything!"
+msgstr "Vous perdrez toutes les données actuelles!"
+
+msgid "NO"
+msgstr "NON"
+
+msgid "Sure"
+msgstr "Ouais"
+
+msgid "All items must either be dealt with or delayed"
+msgstr "Tous les éléments doivent être traités ou reportés"
+
+msgid "Move to the next meeting?"
+msgstr "Passer à la réunion suivante?"
+
+msgid "You will lose the tasks that have been done!"
+msgstr "Les tâches traitées vont disparaître!"
+
+msgid "Download current notes"
+msgstr "Télécharger les notes actuelles"
+
+msgid "Next meeting"
+msgstr "Réunion suivante"

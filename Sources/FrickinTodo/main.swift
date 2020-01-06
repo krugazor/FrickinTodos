@@ -15,6 +15,36 @@ import DictionaryCoding
 import KituraLangNeg
 import KituraTranslation
 
+extension TodoStatus {
+    static var asXSource : String {
+        return """
+        [{value: 'pending', text: '\("pending".t())'},{value: 'done', text: '\("done".t())'},{value: 'delayed', text: '\("delayed".t())'}]
+        """
+    }
+}
+
+extension Todo {
+    var asHtmlNode : Node {
+        return Node.fragment([
+            .h3(
+                .span(attributes: [.id(self.editid)], .img(src: "/edit.png", alt: "Edit")),
+                .span(attributes: [.id(self.titleid)], .text(self.title))
+            ),
+            .div(
+                .div(attributes: [],
+                     .img(attributes: [.id(self.statusid), .src(self.imageName), .alt(self.status.rawValue.t()), .height(.px(24)), .width(.px(24))]),
+                     .span(.raw("&nbsp;")),
+                     .span(attributes:[.id(self.statusid + "t"), .class("status-text")], .text(self.status.rawValue.t()))
+                ),
+                .div(attributes: [],
+                     .span(attributes: [.id(self.commentid)], .text(self.comment ?? " "))
+                )
+            )
+        ])
+        
+    }
+}
+
 func loadTodos(from s: SessionState?) -> TodoList {
     if let t = s?["todos"] as? TodoList {
         return t
@@ -43,7 +73,7 @@ func editableBlurbJS(_ uidVariable: String) -> String {
     pk:    \(uidVariable),
     name:  'title',
     url:   '/change',
-    title: 'Title',
+    title: '\("Title".t())',
     toggle: 'dblclick'
     });
     
@@ -52,41 +82,41 @@ func editableBlurbJS(_ uidVariable: String) -> String {
     pk:    \(uidVariable),
     name:  'comment',
     url:   '/change',
-    title: 'Comment',
+    title: '\("Comment".t())',
     toggle: 'dblclick',
     mode: 'inline',
     inputclass: 'input-comment-edit'
     });
     
     $('#'+\(uidVariable)+'_s').editable({
-    type:  'select',
-    pk:    \(uidVariable),
-    name:  'status',
-    url:   '/change',
-    title: 'Status',
-    toggle: 'click',
-    mode: 'inline',
-    source: \(TodoStatus.asXSource),
-    defaultValue: 'pending',
-    success: function(response, newValue) {
-    if(!response.success) return response.msg;
-    switch(newValue) {
-    case '\(TodoStatus.done.rawValue)':
-    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.done.imageName)");
-    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.done.rawValue)');
-    break;
-    case '\(TodoStatus.pending.rawValue)':
-    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.pending.imageName)");
-    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.pending.rawValue)');
-    break;
-    case '\(TodoStatus.delayed.rawValue)':
-    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.delayed.imageName)");
-    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.delayed.rawValue)');
-    break;
-    default:
-    break;
-    }
-    }
+        type:  'select',
+        pk:    \(uidVariable),
+        name:  'status',
+        url:   '/change',
+        title: '\("Status".t())',
+        toggle: 'click',
+        mode: 'inline',
+        source: \(TodoStatus.asXSource),
+        defaultValue: 'pending',
+        success: function(response, newValue) {
+            if(!response.success) return response.msg;
+            switch(newValue) {
+                case '\(TodoStatus.done.rawValue)':
+                    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.done.imageName)");
+                    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.done.rawValue.t())');
+                    break;
+                case '\(TodoStatus.pending.rawValue)':
+                    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.pending.imageName)");
+                    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.pending.rawValue.t())');
+                    break;
+                case '\(TodoStatus.delayed.rawValue)':
+                    $('#'+\(uidVariable)+'_s').attr("src","\(TodoStatus.delayed.imageName)");
+                    $('#'+\(uidVariable)+'_st').text('\(TodoStatus.delayed.rawValue.t())');
+                    break;
+                default:
+                    break;
+            }
+        }
     });
     
     $('#'+\(uidVariable)+'_e').click(function(e){
@@ -119,65 +149,78 @@ let session = Session(secret: "okmijnuhb", store: redisStore)
 router.all(middleware: session, StaticFileServer(path: "./Public"), BodyParser(), Compression(), ln)
 
 router.get("/") { request, response, next in
+    // LanguageNegotiation should have put its match info
+    // in request.userInfo["LangNeg"], so check for it
+    // there.
+    if request.userInfo["LangNeg"] == nil {
+        Translation.settings!.lang = "en"
+    }
+    else {
+        let match = request.userInfo["LangNeg"] as! LanguageNegotiation.NegMatch
+        // Have Translation use the language that LangNeg
+        // matched on.
+        Translation.settings!.lang = match.lang
+    }
+    
     let todos = loadTodos(from: request.session)
     
     let rendered = todos.list.map { $0.asHtmlNode }
     let editables = todos.list.map { t in
         return """
         $('#\(t.titleid)').editable({
-        type:  'text',
-        pk:    '\(t.id.uuidString)',
-        name:  'title',
-        url:   '/change',
-        title: 'Title',
-        toggle: 'dblclick'
+            type:  'text',
+            pk:    '\(t.id.uuidString)',
+            name:  'title',
+            url:   '/change',
+            title: '\("Title".t())',
+            toggle: 'dblclick'
         });
         
         $('#\(t.commentid)').editable({
-        type:  'textarea',
-        pk:    '\(t.id.uuidString)',
-        name:  'comment',
-        url:   '/change',
-        title: 'Comment',
-        toggle: 'dblclick',
-        mode: 'inline',
-        inputclass: 'input-comment-edit'
+            type:  'textarea',
+            pk:    '\(t.id.uuidString)',
+            name:  'comment',
+            url:   '/change',
+            title: '\("Comment".t())',
+            toggle: 'dblclick',
+            mode: 'inline',
+            inputclass: 'input-comment-edit'
         });
         
         $('#\(t.statusid)').editable({
-        type:  'select',
-        pk:    '\(t.id.uuidString)',
-        name:  'status',
-        url:   '/change',
-        title: 'Status',
-        toggle: 'click',
-        mode: 'inline',
-        source: \(TodoStatus.asXSource),
-        defaultValue: '\(t.status.rawValue)',
-        success: function(response, newValue) {
-        if(!response.success) return response.msg;
-        switch(newValue) {
-        case '\(TodoStatus.done.rawValue)':
-        $("#\(t.statusid)").attr("src","\(TodoStatus.done.imageName)");
-        $("#\(t.statusid+"t")").text('\(TodoStatus.done.rawValue)');
-        break;
-        case '\(TodoStatus.pending.rawValue)':
-        $("#\(t.statusid)").attr("src","\(TodoStatus.pending.imageName)");
-        $("#\(t.statusid+"t")").text('\(TodoStatus.pending.rawValue)');
-        break;
-        case '\(TodoStatus.delayed.rawValue)':
-        $("#\(t.statusid)").attr("src","\(TodoStatus.delayed.imageName)");
-        $("#\(t.statusid+"t")").text('\(TodoStatus.delayed.rawValue)');
-        break;
-        default:
-        break;
-        }
-        }
+            type:  'select',
+            pk:    '\(t.id.uuidString)',
+            name:  'status',
+            url:   '/change',
+            title: '\("Status".t())',
+            toggle: 'click',
+            mode: 'inline',
+            source: \(TodoStatus.asXSource),
+            defaultValue: '\(t.status.rawValue)',
+            success: function(response, newValue) {
+                if(!response.success) return response.msg;
+                switch(newValue) {
+                    case '\(TodoStatus.done.rawValue)':
+                        $("#\(t.statusid)").attr("src","\(TodoStatus.done.imageName)");
+                        $("#\(t.statusid+"t")").text('\(TodoStatus.done.rawValue.t())');
+                        break;
+                    case '\(TodoStatus.pending.rawValue)':
+                        $("#\(t.statusid)").attr("src","\(TodoStatus.pending.imageName)");
+                        $("#\(t.statusid+"t")").text('\(TodoStatus.pending.rawValue.t())');
+                        break;
+                    case '\(TodoStatus.delayed.rawValue)':
+                        $("#\(t.statusid)").attr("src","\(TodoStatus.delayed.imageName)");
+                        $("#\(t.statusid+"t")").text('\(TodoStatus.delayed.rawValue.t())');
+                        break;
+                    default:
+                        break;
+                }
+            }
         });
         
         $('#\(t.editid)').click(function(e){
-        e.stopPropagation();
-        $('#\(t.titleid)').editable('toggle');
+            e.stopPropagation();
+            $('#\(t.titleid)').editable('toggle');
         });
         """
     }
@@ -185,20 +228,7 @@ router.get("/") { request, response, next in
     for e in editables { editscript += e }
     editscript += "});\n"
     
-    // LanguageNegotiation should have put its match info
-     // in request.userInfo["LangNeg"], so check for it
-     // there.
-     if request.userInfo["LangNeg"] == nil {
-         Translation.settings!.lang = "en"
-     }
-     else {
-         let match = request.userInfo["LangNeg"] as! LanguageNegotiation.NegMatch
-         // Have Translation use the language that LangNeg
-         // matched on.
-         Translation.settings!.lang = match.lang
-     }
-    
-    response.send(
+     response.send(
         Node.fragment([
             Node.doctype("html"),
             Node.html(
@@ -231,12 +261,12 @@ router.get("/") { request, response, next in
                         ),
                          .div(
                             .span(attributes: [.style(unsafe: "float: left;")],
-                                  .input(attributes: [.type(.image), .src("/add.png"), .alt("add"), .onclick(unsafe: "newtodo();")]),
-                                  .input(attributes: [.type(.image), .src("/clear.png"), .alt("clear"), .onclick(unsafe: "cleartodos();")])
+                                  .input(attributes: [.type(.image), .src("/add.png"), .alt("add".t()), .onclick(unsafe: "newtodo();")]),
+                                                      .input(attributes: [.type(.image), .src("/clear.png"), .alt("clear".t()), .onclick(unsafe: "cleartodos();")])
                             ),
                             .span(attributes: [.style(unsafe: "float: right;")],
-                                  .input(attributes: [.type(.image), .src("/export.png"), .alt("export"), .onclick(unsafe: "getmd();")]),
-                                  .input(attributes: [.type(.image), .src("/next.png"), .alt("skip"), .onclick(unsafe: "nextMeeting();")])
+                                  .input(attributes: [.type(.image), .src("/export.png"), .alt("export".t()), .onclick(unsafe: "getmd();")]),
+                                  .input(attributes: [.type(.image), .src("/next.png"), .alt("skip".t()), .onclick(unsafe: "nextMeeting();")])
                             )
                         )
                     ),
@@ -252,7 +282,7 @@ router.get("/") { request, response, next in
                       clipboard.on('success', function(e) {
                         $.get("/share"); // make sure we save
                         $('#shareBtn').tooltip( {
-                          content: "Copied to clipboard",
+                        content: "\("Copied to clipboard".t())",
                           show: { duration: 200 },
                           hide: { duration: 200, delay: 200 }
                         }).tooltip("open");
@@ -273,10 +303,10 @@ router.get("/") { request, response, next in
                     function newtodo() {
                       let id = uuidv4();
                       $('#accordion').append( " \
-                        <h3><span id='"+id+"_e'><img src='/edit.png' alt='Edit' /> \
-                        <span id='"+id+"_t'>New</span> \
+                        <h3><span id='"+id+"_e'><img src='/edit.png' alt='\("Edit".t())' /> \
+                        <span id='"+id+"_t'>\("New".t())</span> \
                         </h3> \
-                        <div><div><img id='"+id+"_s' src='/pending.png' alt='pending' height='24px' width='24px' /><span>&nbsp;</span><span id='"+id+"_st'>pending</span></div> \
+                        <div><div><img id='"+id+"_s' src='/pending.png' alt='\("pending".t())' height='24px' width='24px' /><span>&nbsp;</span><span id='"+id+"_st'>\("pending".t())</span></div> \
                              <div><span id='"+id+"_c'></span></div> \
                         </div> \
                       ");
@@ -288,13 +318,13 @@ router.get("/") { request, response, next in
                     }
                         
                     function cleartodos() {
-                        $('<div id="dialog-confirm" title="Remove all notes?"><p>You will lose everything!</p></div>').dialog({
+                        $('<div id="dialog-confirm" title="\("Remove all notes?".t())"><p>\("You will lose everything!".t())</p></div>').dialog({
                           resizable: false,
                           height: "auto",
                           modal: true,
                           buttons: {
-                            "NO": function() { $( this ).dialog( "close" ); },
-                            "Sure": function() {
+                              "\("NO".t())": function() { $( this ).dialog( "close" ); },
+                              "\("Sure".t())": function() {
                               $.post("/clear");
                               $('#accordion').empty();
                               newtodo();
@@ -308,19 +338,19 @@ router.get("/") { request, response, next in
                       var done = true;
                       $("span").each( function(index, element) {
                         if( element.className === "status-text" ) {
-                          done = done && ( element.innerHTML !== '\(TodoStatus.pending.rawValue)' );
+                        done = done && ( element.innerHTML !== '\(TodoStatus.pending.rawValue.t())') && ( element.innerHTML !== '\(TodoStatus.pending.rawValue)') ;
                         }
                       });
                       if( !done ) {
-                        $('<div id="dialog" title="Error"><p>All items must either be dealt with or delayed</p></div').dialog();
+                        $('<div id="dialog" title="\("Error".t())"><p>\("All items must either be dealt with or delayed".t())</p></div').dialog();
                       } else {
-                        $('<div id="dialog-confirm" title="Move to the next meeting?"><p>You will lose the tasks that have been done!</p></div>').dialog({
+                        $('<div id="dialog-confirm" title="\("Move to the next meeting?".t())"><p>\("You will lose the tasks that have been done!".t())</p></div>').dialog({
                           resizable: false,
                           height: "auto",
                           modal: true,
                           buttons: {
-                            "Download current notes": function() { getmd(); },
-                            "Next meeting": function() {
+                            "\("Download current notes".t())": function() { getmd(); },
+                            "\("Next meeting".t())": function() {
                               $.post("/next", function( data ) {
                                 location.reload();
                               });
@@ -358,19 +388,30 @@ router.get("/download") { request, response, next in
 }
 
 router.post("/clear") { request, response, next in
-    saveTodos(TodoList(), to: request.session)
+    // save and move on
+    var todos = loadTodos(from: request.session)
+    permanentlyStore(todos, callback: {_ in })
+    
+    todos = TodoList()
+    saveTodos(todos, to: request.session)
     response.send(json: ["success": true])
     next()
 }
 
 router.post("/new") { request, response, next in
+    if request.userInfo["LangNeg"] == nil {
+        Translation.settings!.lang = "en"
+    }
+    else {
+        let match = request.userInfo["LangNeg"] as! LanguageNegotiation.NegMatch
+        // Have Translation use the language that LangNeg
+        // matched on.
+        Translation.settings!.lang = match.lang
+    }
+
     if let b = request.body, let c = b.asURLEncoded, let uid = c["id"], let uuid = UUID(uuidString: uid) {
         var todos = loadTodos(from: request.session)
-        // save and move on
-        permanentlyStore(todos, callback: {_ in })
-        
-        todos = TodoList()
-        todos.list.append(Todo(id: uuid, title: "New", comment: "", status: .pending))
+        todos.list.append(Todo(id: uuid, title: "New".t(), comment: "", status: .pending))
         saveTodos(todos, to: request.session)
         response.send(json: ["success": true])
     } else {
@@ -382,26 +423,25 @@ router.post("/new") { request, response, next in
 
 router.post("/change") { request, response, next in
     if let b = request.body, let c = b.asURLEncoded {
-        var list = loadTodos(from: request.session)
-        var notes = list.list
+        var notes = loadTodos(from: request.session)
         switch c["name"] {
         case "title":
-            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.firstIndex(where: { $0.id == pkid } ) {
-                var note = notes[noteidx]
+            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.list.firstIndex(where: { $0.id == pkid } ) {
+                var note = notes.list[noteidx]
                 note.title = c["value"] ?? ""
-                notes[noteidx] = note
+                notes.list[noteidx] = note
             }
         case "comment":
-            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.firstIndex(where: { $0.id == pkid } ) {
-                var note = notes[noteidx]
+            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.list.firstIndex(where: { $0.id == pkid } ) {
+                var note = notes.list[noteidx]
                 note.comment = c["value"] ?? ""
-                notes[noteidx] = note
+                notes.list[noteidx] = note
             }
         case "status":
-            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.firstIndex(where: { $0.id == pkid } ) {
-                var note = notes[noteidx]
+            if let pk = c["pk"], let pkid = UUID(uuidString: pk), let noteidx = notes.list.firstIndex(where: { $0.id == pkid } ) {
+                var note = notes.list[noteidx]
                 note.status = TodoStatus(rawValue: c["value"] ?? "") ?? .delayed
-                notes[noteidx] = note
+                notes.list[noteidx] = note
             }
         default:
             response.send(json: ["success": false])
@@ -409,8 +449,7 @@ router.post("/change") { request, response, next in
             return
         }
         
-        list.list = notes
-        saveTodos(list, to: request.session)
+        saveTodos(notes, to: request.session)
         response.send(json: ["success": true])
     } else {
         response.send(json: ["success": false])
