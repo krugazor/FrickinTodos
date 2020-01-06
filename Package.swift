@@ -21,7 +21,7 @@ let package = Package(
         .target(
             name: "FrickinTodo",
 //            dependencies: ["HtmlKituraSupport", "KituraSessionRedis", "KituraSession", "SwiftKuerySQLite"]),
-        dependencies: ["HtmlKituraSupport", "KituraSessionRedis", "KituraSession", "KituraCompression", "HeliumLogger", "DictionaryCoding"]),
+        dependencies: ["Kitura", "HtmlKituraSupport", "KituraSessionRedis", "KituraSession", "KituraCompression", "HeliumLogger", "DictionaryCoding"]),
         .testTarget(
             name: "FrickinTodoTests",
             dependencies: ["FrickinTodo"]),
