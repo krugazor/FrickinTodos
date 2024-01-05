@@ -1,4 +1,4 @@
-FROM swift:latest
+FROM swift:5.2
 
 COPY ./ /app/
 
